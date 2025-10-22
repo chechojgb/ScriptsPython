@@ -1,0 +1,1 @@
+Expone la información a través de endpoints REST

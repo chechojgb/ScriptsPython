@@ -1,0 +1,1 @@
+Maneja la conexión y definición de tablas
