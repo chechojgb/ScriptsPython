@@ -1,1 +1,18 @@
 Lógica que detecta las aplicaciones y guarda registros
+
+Este Modulo sera la parte principal del monitorio, la cual tendra tres partes principales:
+
+1. Obtener el nombre de la app que estas usando acutalmente (pywin32 + psuntil)
+2. Detectar cuando se cambia de actividad o app, calcular el nuevo tiempo. 
+3. Recibir los datos (app,hora de inicio, hora de fin, duraciopn) para luego insertarlos en la base de datos en la tabla "activities"
+
+
+FLujo:
+
+get_active_app() ─► devuelve "chrome.exe" (pagina o app de ejemplo)
+       │
+       ▼
+track_activity() ─► detecta cambios de app
+       │
+       ▼
+save_activity() ─► guarda registro en SQLite
