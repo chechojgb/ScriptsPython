@@ -21,7 +21,8 @@ def init_db():
                        start_time TEXT NOT NULL,
                        end_time TEXT NOT NULL,
                        duration REAL,
-                       date TEXT NOT NULL
+                       date TEXT NOT NULL,
+                       status TEXT DEFAULT 'closed'
                    )
                    ''')
     conn.commit()

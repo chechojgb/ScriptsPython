@@ -3,8 +3,8 @@ from app.tracker.tracker import track_activity
 from datetime import date, datetime
 
 def main():
-    # init_db()
-    track_activity()
+    init_db()
+    # track_activity()
     
     # hoy = date.today()
     # print(hoy)
