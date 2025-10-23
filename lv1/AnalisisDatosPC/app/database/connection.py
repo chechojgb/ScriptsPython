@@ -13,5 +13,16 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    print('Conexion exitosa')
+    cursor.execute('''
+                   CREATE TABLE IF NOT EXISTS activities (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       app_name TEXT NOT NULL,
+                       start_time TEXT NOT NULL,
+                       end_time TEXT NOT NULL,
+                       duration REAL,
+                       date TEXT NOT NULL
+                   )
+                   ''')
     conn.commit()
     conn.close()
