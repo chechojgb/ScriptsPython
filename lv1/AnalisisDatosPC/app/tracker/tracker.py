@@ -2,6 +2,7 @@ from app.tracker.active_window import get_active_app
 from app.database.activity_repo import  save_activity
 import time
 from datetime import datetime, date
+import win32gui
 
 
 
@@ -43,6 +44,26 @@ def track_activity():
             start_time = datetime.now()
             
         time.sleep(5)
+    pass
+        
+        
+        
+def track_web_activity(app_name):
+    navegadores = ['chrome.exe', 'msedge.exe', 'opera.exe', 'firefox.exe']
+    
+    if app_name in navegadores:
+        
+        titulo = win32gui.GetWindowText(win32gui.GetForegroundWindow())
+        print("ventana activa", titulo)
+        
+    pass
+        
+        
+def start_tracking():
+    track_activity()
+    track_web_activity()
+    
+    
             
             
         

@@ -25,5 +25,17 @@ def init_db():
                        status TEXT DEFAULT 'closed'
                    )
                    ''')
+    cursor.execute('''
+                   CREATE TABLE IF NOT EXISTS web_activities (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        browser TEXT NOT NULL,
+                        site_name TEXT NOT NULL,
+                        start_time TEXT NOT NULL,
+                        end_time TEXT NOT NULL,
+                        duration INTEGER NOT NULL,
+                        date TEXT NOT NULL,
+                        status TEXT DEFAULT 'closed'
+                   )
+                   ''')
     conn.commit()
     conn.close()
