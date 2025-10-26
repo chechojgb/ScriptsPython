@@ -28,6 +28,17 @@ def close_active_sessions():
     
     conn.commit()
     conn.close()   
+
+
+def safe_page_navegator(browser, site_name, start_time, end_time, duration, date, status):
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("INSERT INTO web_activities (browser, site_name, start_time, end_time, duration, date,status) VALUES (?,?,?,?,?,?,?);",
+                   (browser, site_name, start_time, end_time, duration, date, status))
+    print(f"Guardado web activies {browser}, {site_name} ")
+    conn.commit()
+    conn.close()
         
     
     
