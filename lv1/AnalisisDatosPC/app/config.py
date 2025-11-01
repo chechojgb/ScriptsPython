@@ -1,11 +1,27 @@
 import os
+import sys
+from pathlib import Path
 
 class Config:
-    # Obtiene la ruta base del proyecto
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    # Ruta del archivo SQLite
-    DB_PATH = os.path.join(BASE_DIR, "data", "productivity.db")
-
-    # Modo debug (para desarrollo)
+    @staticmethod
+    def get_base_dir():
+        """Obtiene el directorio base correcto para desarrollo y producción"""
+        try:
+            if getattr(sys, 'frozen', False):
+                # Ejecutable empaquetado - usar misma carpeta del .exe
+                base_dir = Path(sys.executable).parent
+            else:
+                # Modo desarrollo
+                base_dir = Path(os.getcwd())
+            
+            print(f"Directorio base: {base_dir}")
+            return base_dir
+        except Exception as e:
+            print(f"Error obteniendo directorio base: {e}")
+            return Path(".")  # Fallback al directorio actual
+    
+    
+    DB_PATH = str(get_base_dir() / "../data" / "productivity.db")
+    
+    # Modo debug
     DEBUG = True
