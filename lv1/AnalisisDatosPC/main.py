@@ -1,6 +1,7 @@
 from app.database.connection import init_db
 from app.database.activity_repo import close_active_sessions
 from app.tracker.tracker import track_activity, start_tracking
+from app.config import Config
 from datetime import date, datetime
 import time
 import os
@@ -35,11 +36,17 @@ _/  |_____________    ____ |  | __ ___________     \_____  \  /   _____/
 # Llamar al banner antes de iniciar el rastreo
 
 def main():
-    mostrar_banner_trackerk()
-    time.sleep(3)
-    start_tracking()
-    
+    try:
+        mostrar_banner_trackerk()
+        time.sleep(2)
+        init_db()
+        time.sleep(1)
+        start_tracking()
+        
+    except Exception as e:
+        print(f"Error crítico: {e}")
+        print(f"Ruta de BD intentada: {Config.DB_PATH}")
+        input("Presiona Enter para salir...")
     
 if __name__ == "__main__":
     main()
-    os.system("pause")
