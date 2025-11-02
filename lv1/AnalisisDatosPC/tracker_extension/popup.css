@@ -1,0 +1,102 @@
+body {
+  background-color: #0a0a0f;
+  color: #e0e0e0;
+  font-family: 'Consolas', 'Courier New', monospace;
+  margin: 0;
+  padding: 0;
+  width: 300px;
+  height: auto;
+}
+
+.container {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+}
+
+.title span {
+  color: #00ffb3;
+}
+
+.status-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 255, 179, 0.2);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 5px rgba(0, 255, 179, 0.1);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.dot.green {
+  background-color: #00ffb3;
+  box-shadow: 0 0 5px #00ffb3;
+}
+
+.dot.red {
+  background-color: #ff4d4d;
+  box-shadow: 0 0 5px #ff4d4d;
+}
+
+.activity-list {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+  height: 120px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.activity-list h3 {
+  font-size: 14px;
+  margin-bottom: 5px;
+  text-align: center;
+  color: #00ffb3;
+}
+
+.activity-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.activity-list li {
+  padding: 3px 0;
+  font-size: 13px;
+  color: #cfcfcf;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.btn {
+  background-color: #00ffb3;
+  color: #0a0a0f;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.btn:hover {
+  background-color: #00e0a3;
+}
