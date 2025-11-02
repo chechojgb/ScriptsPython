@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "TrackerOS Web Activity",
+  "version": "1.0",
+  "description": "Detecta la pestaña activa y envía dominio+title al backend local",
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon48.png"
+    }
+  }
+}

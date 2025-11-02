@@ -21,7 +21,7 @@ class Config:
             return Path(".")  # Fallback al directorio actual
     
     
-    DB_PATH = str(get_base_dir() / "../data" / "productivity.db")
+    DB_PATH = str(get_base_dir() / "data" / "productivity.db")
     
     # Modo debug
     DEBUG = True

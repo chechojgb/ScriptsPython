@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrackerOS Monitor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h2 class="title">Tracker<span>OS</span></h2>
+
+    <div class="status-card">
+      <span id="status-text">Desconectado</span>
+    </div>
+
+    <div class="activity-list">
+      <h3>Últimas actividades</h3>
+      <ul id="recent-activities">
+        <li>Sin datos aún...</li>
+      </ul>
+    </div>
+
+    <button id="flush-btn" class="btn">Reintentar cola</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
