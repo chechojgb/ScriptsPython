@@ -1,52 +1,36 @@
-from app.database.connection import init_db
-from app.database.activity_repo import close_active_sessions
-from app.tracker.tracker import track_activity, start_tracking
-from app.config import Config
-from datetime import date, datetime
-import time
+# main.py (compilado como ActivityTracker.exe SIN consola)
 import os
-import itertools
 import sys
+import time
+import logging
+from datetime import datetime
 
-
-def mostrar_banner_trackerk():
-    os.system('cls' if os.name == 'nt' else 'clear')
-    
-    banner = r"""
-  __                        __                     ________    _________
-_/  |_____________    ____ |  | __ ___________     \_____  \  /   _____/
-\   __\_  __ \__  \ _/ ___\|  |/ // __ \_  __ \     /   |   \ \_____  \ 
- |  |  |  | \// __ \\  \___|    <\  ___/|  | \/    /    |    \/        \
- |__|  |__|  (____  /\___  >__|_ \\___  >__|       \_______  /_______  /
-                  \/     \/     \/    \/                   \/        \/                                 
-    """
-    
-    print(banner)
-    print("Consola segura iniciando TRACKERK OS...\n")
-
-    spinner = itertools.cycle(['-', '\\', '|', '/'])
-    for _ in range(30):
-        sys.stdout.write(f"\r Ejecutando TrackerK OS {next(spinner)}")
-        sys.stdout.flush()
-        time.sleep(0.08)
-
-    print("\n TrackerK OS se ha iniciado correctamente.\n")
-    time.sleep(1)
-
-# Llamar al banner antes de iniciar el rastreo
+# Configurar logging
+log_path = os.path.join(os.path.expanduser("~"), "Documents", "trackerk.log")
+logging.basicConfig(
+    filename=log_path,
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s'
+)
 
 def main():
     try:
-        mostrar_banner_trackerk()
-        time.sleep(2)
+        logging.info("TrackerK ejecutándose en segundo plano - %s", 
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        
+        from app.database.connection import init_db
+        from app.tracker.tracker import start_tracking
+        
+        # Inicializar BD
         init_db()
-        time.sleep(1)
+        logging.info("Base de datos lista")
+        
+        # Iniciar tracking infinito
         start_tracking()
         
     except Exception as e:
-        print(f"Error crítico: {e}")
-        print(f"Ruta de BD intentada: {Config.DB_PATH}")
-        input("Presiona Enter para salir...")
-    
+        logging.error(f"Error crítico: {e}")
+        time.sleep(5)  # Esperar antes de cerrar para ver el error
+
 if __name__ == "__main__":
     main()
