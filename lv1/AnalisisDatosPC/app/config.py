@@ -25,3 +25,7 @@ class Config:
     
     # Modo debug
     DEBUG = True
+    
+    
+# pyinstaller --onefile main.py -n ActivityTracker
+#  pyinstaller --onefile --noconsole main.py -n ActivityTracker
