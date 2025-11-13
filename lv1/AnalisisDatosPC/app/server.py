@@ -40,7 +40,7 @@ def get_db_connection():
         conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as e:
-        print(f"❌ Error conectando a BD: {e}")
+        print(f" Error conectando a BD: {e}")
         return None
 
 # ==================== ENDPOINTS PARA LA EXTENSIÓN (EXISTENTES) ====================
@@ -74,9 +74,9 @@ async def receive_activity(request: Request):
         start_time_str = start_dt_local.strftime("%H:%M:%S")
         end_time_str = end_dt_local.strftime("%H:%M:%S")
         
-        print(f"💾 Guardando: {domain} - {duration}s")
-        print(f"🕒 Horas: {start_time_str} a {end_time_str}")
-        print(f"📅 Fecha: {date_today}")
+        print(f"Guardando: {domain} - {duration}s")
+        print(f"Horas: {start_time_str} a {end_time_str}")
+        print(f"Fecha: {date_today}")
 
         # Usar función específica para datos de extensión
         safe_page_navegator(
@@ -89,11 +89,11 @@ async def receive_activity(request: Request):
             status             # status
         )
 
-        print(f"✅ Página guardada correctamente: {domain}")
+        print(f"Página guardada correctamente: {domain}")
         return {"status": "ok"}
         
     except Exception as e:
-        print(f"❌ Error procesando actividad: {e}")
+        print(f"Error procesando actividad: {e}")
         return {"status": "error", "message": str(e)}
 
 # ==================== NUEVOS ENDPOINTS PARA EL FRONTEND REACT ====================
@@ -319,6 +319,129 @@ async def get_reports(start_date: str, end_date: str):
         
     except Exception as e:
         return {"error": f"Error generando reportes: {e}"}
+    finally:
+        conn.close()
+
+@app.get("/api/weekly-changes")
+async def get_weekly_changes():
+    """Obtiene los cambios de esta semana vs la semana anterior"""
+    conn = get_db_connection()
+    if not conn:
+        return {"error": "No se pudo conectar a la BD"}
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Definir rangos de fecha (esta semana vs semana anterior)
+        today = datetime.now().date()
+        start_current_week = today - timedelta(days=today.weekday())  # Lunes de esta semana
+        end_current_week = start_current_week + timedelta(days=6)     # Domingo de esta semana
+        
+        start_previous_week = start_current_week - timedelta(days=7)  # Lunes semana anterior
+        end_previous_week = start_previous_week + timedelta(days=6)   # Domingo semana anterior
+        
+        # 1. APPS NUEVAS ESTA SEMANA
+        cursor.execute("""
+            SELECT COUNT(DISTINCT app_name) as new_apps
+            FROM activities 
+            WHERE date BETWEEN ? AND ?
+            AND app_name NOT IN (
+                SELECT DISTINCT app_name 
+                FROM activities 
+                WHERE date BETWEEN ? AND ?
+            )
+        """, (start_current_week, end_current_week, start_previous_week, end_previous_week))
+        new_apps = cursor.fetchone()["new_apps"] or 0
+        
+        # 2. SITIOS NUEVOS ESTA SEMANA
+        cursor.execute("""
+            SELECT COUNT(DISTINCT site_name) as new_sites
+            FROM web_activities 
+            WHERE date BETWEEN ? AND ?
+            AND site_name NOT IN (
+                SELECT DISTINCT site_name 
+                FROM web_activities 
+                WHERE date BETWEEN ? AND ?
+            )
+        """, (start_current_week, end_current_week, start_previous_week, end_previous_week))
+        new_sites = cursor.fetchone()["new_sites"] or 0
+        
+        # 3. TIEMPO TOTAL ESTA SEMANA vs SEMANA ANTERIOR
+        cursor.execute("""
+            SELECT SUM(duration) / 3600.0 as total_hours
+            FROM activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_current_week, end_current_week))
+        current_week_app_time = cursor.fetchone()["total_hours"] or 0
+        
+        cursor.execute("""
+            SELECT SUM(duration) / 3600.0 as total_hours
+            FROM web_activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_current_week, end_current_week))
+        current_week_web_time = cursor.fetchone()["total_hours"] or 0
+        
+        current_week_total = current_week_app_time + current_week_web_time
+        
+        # Tiempo semana anterior
+        cursor.execute("""
+            SELECT SUM(duration) / 3600.0 as total_hours
+            FROM activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_previous_week, end_previous_week))
+        previous_week_app_time = cursor.fetchone()["total_hours"] or 0
+        
+        cursor.execute("""
+            SELECT SUM(duration) / 3600.0 as total_hours
+            FROM web_activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_previous_week, end_previous_week))
+        previous_week_web_time = cursor.fetchone()["total_hours"] or 0
+        
+        previous_week_total = previous_week_app_time + previous_week_web_time
+        
+        # 4. PORCENTAJE DE CAMBIO
+        time_change_percent = 0
+        if previous_week_total > 0:
+            time_change_percent = ((current_week_total - previous_week_total) / previous_week_total) * 100
+        
+        # 5. APPS ÚNICAS (total de apps diferentes esta semana)
+        cursor.execute("""
+            SELECT COUNT(DISTINCT app_name) as unique_apps
+            FROM activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_current_week, end_current_week))
+        unique_apps = cursor.fetchone()["unique_apps"] or 0
+        
+        # 6. SITIOS ÚNICOS (total de sitios diferentes esta semana)
+        cursor.execute("""
+            SELECT COUNT(DISTINCT site_name) as unique_sites
+            FROM web_activities 
+            WHERE date BETWEEN ? AND ?
+        """, (start_current_week, end_current_week))
+        unique_sites = cursor.fetchone()["unique_sites"] or 0
+        
+        return {
+            "time_total": {
+                "hours": round(current_week_total, 1),
+                "change_percent": round(time_change_percent, 1)
+            },
+            "unique_apps": {
+                "count": unique_apps,
+                "new_this_week": new_apps
+            },
+            "unique_sites": {
+                "count": unique_sites, 
+                "new_this_week": new_sites
+            },
+            "date_range": {
+                "current_week": f"{start_current_week} to {end_current_week}",
+                "previous_week": f"{start_previous_week} to {end_previous_week}"
+            }
+        }
+        
+    except Exception as e:
+        return {"error": f"Error calculando cambios semanales: {e}"}
     finally:
         conn.close()
 
