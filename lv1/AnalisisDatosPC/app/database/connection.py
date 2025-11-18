@@ -37,6 +37,20 @@ def init_db():
                             status TEXT DEFAULT 'closed'
                     )
                     ''')
+        cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            category TEXT NOT NULL UNIQUE
+                        );
+                       ''')
+        cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS domain_category_map (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            domain TEXT NOT NULL UNIQUE,
+                            category_id INTEGER NOT NULL,
+                            FOREIGN KEY (category_id) REFERENCES categories(id)
+                        );
+                       ''')
         conn.commit()
         conn.close()
     except Exception as e:

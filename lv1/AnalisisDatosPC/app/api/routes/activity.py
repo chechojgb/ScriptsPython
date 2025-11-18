@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
-from app.database.activity_repo import safe_page_navegator
+from app.database.activity_repo import safe_page_navegator, view_domain, save_domain_category
+from app.api.IA.iaohttp import classify_domain
 from app.database.connection import get_db_connection
 from datetime import datetime, timedelta
 router = APIRouter()
@@ -37,16 +38,26 @@ async def receive_activity(request: Request):
         print(f"Horas: {start_time_str} a {end_time_str}")
         print(f"Fecha: {date_today}")
 
-        # Usar función específica para datos de extensión
-        safe_page_navegator(
-            browser,           # browser
-            domain,            # site_name
-            start_time_str,    # start_time (string)
-            end_time_str,      # end_time (string)
-            duration,          # duration
-            date_today,        # date
-            status             # status
-        )
+        category_id = view_domain(domain)
+        if category_id : 
+            #Revisar si existe o no el dominio categorizado, si esta bien guardar solo la consulta de navegador
+            # Usar función específica para datos de extensión
+            safe_page_navegator(
+                browser,           # browser
+                domain,            # site_name
+                start_time_str,    # start_time (string)
+                end_time_str,      # end_time (string)
+                duration,          # duration
+                date_today,        # date
+                status             # status
+            )
+        else: 
+            #si no existe llamar a la ia para que nos de un id de categoria
+            print("Categoria no encontrada")
+            category_id = await classify_domain(domain)
+            print(f"Categoria asignada por ia ID {category_id}")
+            save_domain_category(domain,category_id)
+        
 
         print(f"Página guardada correctamente: {domain}")
         return {"status": "ok"}
@@ -54,3 +65,4 @@ async def receive_activity(request: Request):
     except Exception as e:
         print(f"Error procesando actividad: {e}")
         return {"status": "error", "message": str(e)}
+    

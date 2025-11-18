@@ -5,6 +5,7 @@ from app.database.connection import init_db
 from app.api.routers import register_routes
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
