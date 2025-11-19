@@ -69,6 +69,20 @@ async def get_reports(
         """, (start_date, end_date))
         web_summary = cursor.fetchone()
         
+        cursor.execute("""
+                        SELECT 
+                            c.category,
+                            COUNT(DISTINCT dcm.domain) as domain_count,
+                            SUM(COALESCE(wa.duration, 0)) as total_time
+                        FROM categories c
+                        LEFT JOIN domain_category_map dcm ON c.id = dcm.category_id
+                        LEFT JOIN web_activities wa ON dcm.domain = wa.site_name 
+                            AND wa.date BETWEEN ? AND ?
+                        GROUP BY c.id, c.category
+                        ORDER BY total_time DESC;
+                        """, (start_date, end_date))
+        categories_data = cursor.fetchall()
+        
         # Combinar resúmenes - CON MEJOR MANEJO DE None
         summary = {
             "appsTracked": app_summary["appsTracked"] if app_summary and app_summary["appsTracked"] is not None else 0,
@@ -85,7 +99,8 @@ async def get_reports(
             "sitesTime": sites_time,
             "summary": summary,
             "dateRange": f"{start_date} to {end_date}",
-            "period": period
+            "period": period,
+            "categories_data": categories_data
         }
         
     except Exception as e:
