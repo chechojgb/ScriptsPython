@@ -11,6 +11,7 @@ let pageStartTime = null;
 let pageInterval = null;
 let checkInterval = null;
 let isBrowserActive = true; // Estado de actividad del navegador
+let activityCheckInterval = null;
 
 // Helper: extraer hostname (dominio) desde una URL
 function extractDomain(url) {
@@ -63,7 +64,7 @@ async function sendPageWithDuration() {
         browser: detectBrowser(currentPage.url)
     };
     
-    console.log(` Enviando última página: ${currentPage.domain} - ${duration}s`);
+    console.log(`Enviando página: ${currentPage.domain} - ${duration}s`);
     const success = await sendEvent(payload);
     
     if (success) {
@@ -84,28 +85,33 @@ function detectBrowser(url) {
     return 'browser.exe';
 }
 
-// Sistema unificado de detección de actividad
-async function updateBrowserActivity() {
+// Sistema SIMPLIFICADO de detección de actividad - solo verifica ventanas con foco
+async function checkBrowserActivity() {
     try {
         const windows = await chrome.windows.getAll({ windowTypes: ['normal', 'popup'] });
-        const hasFocusedWindow = windows.some(window => window.focused && window.state !== 'minimized');
+        const hasFocusedWindow = windows.some(window => window.focused);
         
         if (hasFocusedWindow && !isBrowserActive) {
             // Navegador acaba de ganar foco
-            console.log("Navegador en primer plano - reactivando tracking");
+            console.log("NAVEGADOR ACTIVO - Reactivando tracking");
             isBrowserActive = true;
-            await checkActivePage(); // Verificar página actual inmediatamente
+            
+            // Verificar página actual inmediatamente
+            setTimeout(checkActivePage, 500);
+            
         } else if (!hasFocusedWindow && isBrowserActive) {
             // Navegador acaba de perder foco
-            console.log(" Navegador en segundo plano - pausando tracking");
+            console.log("NAVEGADOR EN SEGUNDO PLANO - Pausando tracking");
             isBrowserActive = false;
             
             // Enviar página actual antes de pausar
             if (currentPage) {
-                console.log("Enviando última página antes de pausar...");
-                await sendPageWithDuration();
-                currentPage = null;
-                pageStartTime = null;
+                console.log(" Enviando última página antes de pausar...");
+                const success = await sendPageWithDuration();
+                if (success) {
+                    currentPage = null;
+                    pageStartTime = null;
+                }
             }
             
             // Limpiar intervalo de página
@@ -114,22 +120,31 @@ async function updateBrowserActivity() {
                 pageInterval = null;
             }
         }
+        
+        // Log del estado actual (solo si cambió)
+        logActivityStatus();
+        
     } catch (error) {
-        console.error("Error actualizando actividad:", error);
+        console.error("Error verificando actividad:", error);
     }
+}
+
+// Log del estado de actividad
+function logActivityStatus() {
+    console.log(`Estado: ${isBrowserActive ? 'ACTIVO' : 'SEGUNDO PLANO'} | Página: ${currentPage?.domain || 'Ninguna'}`);
 }
 
 // Iniciar tracking de una nueva página
 async function startTrackingPage(tab) {
     // Si el navegador no está activo, no hacer tracking
     if (!isBrowserActive) {
-        console.log("  Navegador en segundo plano - no se lee información");
+        console.log(" Ignorando - Navegador en segundo plano");
         return;
     }
     
     // Validar URL
     if (!tab || !isValidURL(tab.url)) {
-        console.log(` URL no válida para tracking: ${tab?.url}`);
+        console.log(`Ignorando - URL no válida: ${tab?.url}`);
         return;
     }
     
@@ -155,7 +170,7 @@ async function startTrackingPage(tab) {
     // Actualizar estado con nueva página
     currentPage = newPage;
     pageStartTime = new Date();
-    console.log(`  Nueva página: ${currentPage.domain}`);
+    console.log(`Nueva página: ${currentPage.domain}`);
 
     // Reiniciar intervalo de 1 minuto
     if (pageInterval) clearInterval(pageInterval);
@@ -164,7 +179,7 @@ async function startTrackingPage(tab) {
             await sendPageWithDuration();
             // Reiniciar contador para el próximo minuto
             pageStartTime = new Date();
-            console.log(` Minuto completado: ${currentPage.domain}`);
+            console.log(`Minuto completado: ${currentPage.domain}`);
         }
     }, 60000);
 }
@@ -172,7 +187,6 @@ async function startTrackingPage(tab) {
 // Verificar periódicamente si cambió la página activa
 async function checkActivePage() {
     if (!isBrowserActive) {
-        console.log("⏸ Navegador en segundo plano - no se verifica página activa");
         return;
     }
     
@@ -182,7 +196,7 @@ async function checkActivePage() {
             await startTrackingPage(tab);
         } else if (currentPage) {
             // Si no hay pestaña activa válida pero hay una página en tracking, detenerla
-            console.log("No hay pestaña activa válida - deteniendo tracking actual");
+            console.log("No hay pestaña activa válida - deteniendo tracking");
             await sendPageWithDuration();
             currentPage = null;
             pageStartTime = null;
@@ -207,7 +221,7 @@ async function enqueueEvent(event) {
         
         // Si aún excede el límite después de limpiar, remover los más viejos
         if (queue.length >= MAX_QUEUE_SIZE) {
-            console.warn(` Cola llena (${queue.length}), removiendo eventos más antiguos`);
+            console.warn(`Cola llena (${queue.length}), removiendo eventos más antiguos`);
             queue = queue.slice(-Math.floor(MAX_QUEUE_SIZE * 0.8));
         }
         
@@ -226,11 +240,7 @@ async function sendEvent(event) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
-        console.log(`Enviando evento a ${BACKEND_URL}:`, {
-            domain: event.domain,
-            duration: event.duration,
-            startTime: event.startTime
-        });
+        console.log(`Enviando evento: ${event.domain} - ${event.duration}s`);
         
         const resp = await fetch(BACKEND_URL, {
             method: "POST",
@@ -245,17 +255,15 @@ async function sendEvent(event) {
             throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
         }
         
-        console.log(" Evento enviado exitosamente al backend");
+        console.log("Evento enviado exitosamente");
         return true;
     } catch (err) {
-        console.warn(" Error enviando evento:", err.message);
+        console.warn("Error enviando evento:", err.message);
         
         // Solo encolar si es un error de red/tiempo fuera
         if (err.name === 'TypeError' || err.name === 'AbortError') {
             await enqueueEvent(event);
-            console.log(" Evento guardado en cola para reintento");
-        } else {
-            console.log("Error del servidor, no encolando evento");
+            console.log("Evento guardado en cola para reintento");
         }
         return false;
     }
@@ -263,6 +271,11 @@ async function sendEvent(event) {
 
 // Función para vaciar la cola de eventos pendientes
 async function flushQueue() {
+    if (!isBrowserActive) {
+        console.log("Navegador en segundo plano - no se vacía cola");
+        return;
+    }
+    
     const data = await chrome.storage.local.get({queue: []});
     let queue = data.queue || [];
     
@@ -302,12 +315,11 @@ async function flushQueue() {
     console.log(`Cola procesada: ${successCount} exitosos, ${remaining.length} pendientes`);
 }
 
-// Listeners para cambios de pestaña
+// ========== LISTENERS SIMPLIFICADOS ==========
+
+// Listeners para cambios de pestaña - SOLO si el navegador está activo
 chrome.tabs.onActivated.addListener((activeInfo) => {
-    if (!isBrowserActive) {
-        console.log("⏸Navegador en segundo plano - no se detectan cambios de pestaña");
-        return;
-    }
+    if (!isBrowserActive) return;
     
     chrome.tabs.get(activeInfo.tabId, (tab) => {
         if (tab && isValidURL(tab.url)) {
@@ -317,67 +329,58 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (!isBrowserActive) {
-        console.log("⏸Navegador en segundo plano - no se detectan actualizaciones de pestaña");
-        return;
-    }
+    if (!isBrowserActive) return;
     
     if ((changeInfo.status === 'complete' || changeInfo.url) && isValidURL(tab.url)) {
         startTrackingPage(tab);
     }
 });
 
-// Sistema principal de detección de actividad
+// Listener SIMPLE para cambios de foco - solo marca el cambio principal
 chrome.windows.onFocusChanged.addListener((windowId) => {
-    if (windowId === chrome.windows.WINDOW_ID_NONE) {
-        // Ninguna ventana tiene foco
-        console.log(" Todas las ventanas perdieron foco");
-        if (isBrowserActive) {
-            isBrowserActive = false;
-            
-            // Enviar página actual inmediatamente
-            if (currentPage) {
-                console.log("Enviando última página antes de pausar...");
-                sendPageWithDuration().then(() => {
-                    currentPage = null;
-                    pageStartTime = null;
-                });
-            }
-        }
-    } else {
-        // Una ventana ganó foco - verificar si es del navegador
-        console.log("Ventana ganó foco - verificando si es del navegador...");
-        setTimeout(updateBrowserActivity, 100);
-    }
+    // Pequeño delay para que el sistema actualice el estado de las ventanas
+    setTimeout(checkBrowserActivity, 100);
 });
 
-// Inicialización
-chrome.runtime.onStartup.addListener(() => {
-    console.log("Extensión iniciada - iniciando servicios");
-    isBrowserActive = true;
+// ========== INICIALIZACIÓN ==========
+
+async function initializeExtension() {
+    console.log("Iniciando extensión...");
+    
+    // Inicializar storage
+    await chrome.storage.local.set({queue: []});
     
     // Verificar estado inicial
-    setTimeout(updateBrowserActivity, 1000);
+    await checkBrowserActivity();
     
     // Iniciar verificaciones periódicas
     checkInterval = setInterval(checkActivePage, CHECK_INTERVAL_MS);
     setInterval(flushQueue, RETRY_INTERVAL_MS);
     
-    // Verificar actividad cada 3 segundos (como backup)
-    setInterval(updateBrowserActivity, 3000);
+    // Verificar actividad cada 2 segundos - MÁS FRECUENTE para mejor respuesta
+    activityCheckInterval = setInterval(checkBrowserActivity, 2000);
+    
+    console.log("Extensión inicializada correctamente");
+    logActivityStatus();
+}
+
+// Listeners de ciclo de vida
+chrome.runtime.onStartup.addListener(() => {
+    console.log("Runtime startup");
+    initializeExtension();
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-    console.log("Extensión instalada - inicializando");
-    chrome.storage.local.set({queue: []});
-    isBrowserActive = true;
+    console.log("Extensión instalada/actualizada");
+    initializeExtension();
 });
 
 // Limpiar recursos
 chrome.runtime.onSuspend.addListener(() => {
-    console.log(" Extensión suspendida - limpiando recursos");
+    console.log("Suspension - limpiando recursos");
     if (pageInterval) clearInterval(pageInterval);
     if (checkInterval) clearInterval(checkInterval);
+    if (activityCheckInterval) clearInterval(activityCheckInterval);
     
     if (currentPage && isBrowserActive) {
         sendPageWithDuration().catch(console.error);
@@ -388,38 +391,27 @@ chrome.runtime.onSuspend.addListener(() => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "flushQueue") {
         flushQueue()
-            .then(() => sendResponse({ ok: true, message: "Cola enviada correctamente" }))
-            .catch(() => sendResponse({ ok: false, message: "Error al enviar cola" }));
+            .then(() => sendResponse({ ok: true, message: "Cola enviada" }))
+            .catch(() => sendResponse({ ok: false, message: "Error" }));
         return true;
     }
     
     if (message.action === "getStatus") {
         sendResponse({
             isBrowserActive: isBrowserActive,
-            currentPage: currentPage,
+            currentPage: currentPage?.domain,
             pageStartTime: pageStartTime
         });
         return true;
     }
     
-    if (message.action === "forceStatusCheck") {
-        updateBrowserActivity()
-            .then(() => sendResponse({ ok: true, currentStatus: isBrowserActive }))
-            .catch(() => sendResponse({ ok: false }));
+    if (message.action === "forceActivityCheck") {
+        checkBrowserActivity()
+            .then(() => sendResponse({ 
+                ok: true, 
+                currentStatus: isBrowserActive,
+                currentPage: currentPage?.domain 
+            }));
         return true;
     }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
