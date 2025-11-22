@@ -1,45 +1,74 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.database.connection import get_db_connection
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from typing import Optional
 
 router = APIRouter()
 
+def calculate_period_dates(period: str):
+    today = date.today()
+    
+    if period == "daily":
+        start_date = today
+        end_date = today
+    elif period == "weekly":
+        # Semana completa de lunes a domingo
+        start_date = today - timedelta(days=today.weekday())
+        end_date = start_date + timedelta(days=6)
+    elif period == "monthly":
+        # Mes completo actual
+        start_date = today.replace(day=1)
+        # Último día del mes actual
+        next_month = today.replace(day=28) + timedelta(days=4)
+        end_date = next_month - timedelta(days=next_month.day)
+    else:  # "complete" o "total"
+        # Desde el inicio de los registros hasta hoy
+        start_date = date(2020, 1, 1)  # Fecha inicial por defecto
+        end_date = today
+    
+    return start_date, end_date
+
+def get_previous_period(start_date: date, end_date: date, period: str):
+    days_diff = (end_date - start_date).days
+    
+    if period == "daily":
+        prev_start = start_date - timedelta(days=1)
+        prev_end = end_date - timedelta(days=1)
+    elif period == "weekly":
+        prev_start = start_date - timedelta(days=7)
+        prev_end = end_date - timedelta(days=7)
+    elif period == "monthly":
+        # Mes anterior completo
+        prev_start = (start_date.replace(day=1) - timedelta(days=1)).replace(day=1)
+        prev_end = start_date - timedelta(days=1)
+    else:  # complete
+        # Para el período completo, comparar con el mismo período pero terminando ayer
+        prev_end = start_date - timedelta(days=1)
+        prev_start = start_date - timedelta(days=(days_diff + 1))
+    
+    return prev_start, prev_end
+
 @router.get("/api/analytics")
-async def get_analytics(timeframe: str = "7d"):
+async def get_analytics(
+    start_date: Optional[str] = None, 
+    end_date: Optional[str] = None,
+    period: str = "complete"  # Valor por defecto cambiado a weekly
+):        
     """Análisis avanzados para la página de analytics"""
     conn = get_db_connection()
     if not conn:
-        return {"error": "No se pudo conectar a la BD"}
+        raise HTTPException(status_code=500, detail="No se pudo conectar a la BD")
     
     try:
-        # Calcular fecha de inicio según timeframe
-        today = datetime.now().date()
-        
-        if timeframe == "ayer":
-            start_date = today - timedelta(days=1)
-            end_date = today - timedelta(days=1)
-        elif timeframe == "esta_semana":
-            start_date = today - timedelta(days=today.weekday())
-            end_date = today
-        elif timeframe == "este_mes":
-            start_date = today.replace(day=1)
-            end_date = today
-        elif timeframe == "completo":
-            # Fecha muy antigua para obtener todos los datos
-            start_date = today - timedelta(days=365*2)  # 2 años atrás
-            end_date = today
-        elif timeframe == "7d":
-            start_date = today - timedelta(days=7)
-            end_date = today
-        elif timeframe == "30d":
-            start_date = today - timedelta(days=30)
-            end_date = today
+        # Si se proporcionan fechas específicas, usarlas; si no, calcular según período
+        if start_date and end_date:
+            start_date_obj = date.fromisoformat(start_date)
+            end_date_obj = date.fromisoformat(end_date)
         else:
-            start_date = today - timedelta(days=7)
-            end_date = today
+            start_date_obj, end_date_obj = calculate_period_dates(period)
             
-        start_date_str = start_date.isoformat()
-        end_date_str = end_date.isoformat()
+        start_date_str = start_date_obj.isoformat()
+        end_date_str = end_date_obj.isoformat()
         
         cursor = conn.cursor()
         
@@ -58,7 +87,7 @@ async def get_analytics(timeframe: str = "7d"):
         # 2. DISTRIBUCIÓN POR CATEGORÍAS (con porcentajes)
         cursor.execute("""
             SELECT 
-                c.category,
+                COALESCE(c.category, 'Uncategorized') as category,
                 COUNT(DISTINCT dcm.domain) as domain_count,
                 SUM(COALESCE(wa.duration, 0)) as total_time
             FROM categories c
@@ -66,11 +95,12 @@ async def get_analytics(timeframe: str = "7d"):
             LEFT JOIN web_activities wa ON dcm.domain = wa.site_name 
                 AND wa.date BETWEEN ? AND ?
             GROUP BY c.id, c.category
+            HAVING SUM(COALESCE(wa.duration, 0)) > 0
             ORDER BY total_time DESC;
         """, (start_date_str, end_date_str))
         categories_data = cursor.fetchall()
         
-        # Calcular porcentajes
+        # Calcular porcentajes solo con categorías que tienen tiempo
         total_category_time = sum(row[2] for row in categories_data)
         categories_with_percentages = []
         for category, domain_count, total_time in categories_data:
@@ -161,23 +191,7 @@ async def get_analytics(timeframe: str = "7d"):
             })
         
         # 5. TENDENCIAS (comparación con período anterior)
-        # Calcular período anterior para comparación
-        if timeframe == "ayer":
-            prev_start = start_date - timedelta(days=1)
-            prev_end = end_date - timedelta(days=1)
-        elif timeframe == "esta_semana":
-            prev_start = start_date - timedelta(days=7)
-            prev_end = start_date - timedelta(days=1)
-        elif timeframe == "este_mes":
-            # Mes anterior
-            prev_start = (start_date.replace(day=1) - timedelta(days=1)).replace(day=1)
-            prev_end = start_date - timedelta(days=1)
-        else:
-            # Para 7d, 30d, etc.
-            period_days = (end_date - start_date).days
-            prev_start = start_date - timedelta(days=period_days)
-            prev_end = start_date - timedelta(days=1)
-        
+        prev_start, prev_end = get_previous_period(start_date_obj, end_date_obj, period)
         prev_start_str = prev_start.isoformat()
         prev_end_str = prev_end.isoformat()
         
@@ -197,11 +211,35 @@ async def get_analytics(timeframe: str = "7d"):
         if prev_total_hours > 0:
             hours_change = ((total_hours - prev_total_hours) / prev_total_hours) * 100
         
+        # 6. ACTIVIDADES POR FECHA (para gráficos de tendencia)
+        cursor.execute("""
+            SELECT 
+                date,
+                SUM(duration) / 3600.0 as daily_hours
+            FROM (
+                SELECT date, duration FROM activities WHERE date BETWEEN ? AND ?
+                UNION ALL
+                SELECT date, duration FROM web_activities WHERE date BETWEEN ? AND ?
+            )
+            GROUP BY date
+            ORDER BY date
+        """, (start_date_str, end_date_str, start_date_str, end_date_str))
+        daily_trends_data = cursor.fetchall()
+        
+        daily_trends = []
+        for activity_date, daily_hours in daily_trends_data:
+            daily_trends.append({
+                "date": activity_date,
+                "hours": round(daily_hours, 2)
+            })
+        
         return {
-            "timeframe": timeframe,
-            "period": {
+            "period": period,
+            "period_date": {
                 "start": start_date_str,
-                "end": end_date_str
+                "end": end_date_str,
+                "previous_start": prev_start_str,
+                "previous_end": prev_end_str
             },
             "total_hours": round(total_hours, 2),
             "categories": categories_with_percentages,
@@ -213,12 +251,13 @@ async def get_analytics(timeframe: str = "7d"):
             },
             "trends": {
                 "hours_change_percent": round(hours_change, 1),
-                "previous_period_hours": round(prev_total_hours, 2)
+                "previous_period_hours": round(prev_total_hours, 2),
+                "daily_trends": daily_trends
             },
             "generatedAt": datetime.now().isoformat()
         }
         
     except Exception as e:
-        return {"error": f"Error en analytics: {str(e)}"}
+        raise HTTPException(status_code=500, detail=f"Error en analytics: {str(e)}")
     finally:
         conn.close()
