@@ -23,32 +23,6 @@ async def get_reports(
         start_date = date_range["start_date"]
         end_date = date_range["end_date"]
         
-        # Tiempo por aplicación - CON COALESCE
-        cursor.execute("""
-            SELECT 
-                app_name as name,
-                COALESCE(SUM(duration), 0) / 3600.0 as hours
-            FROM activities 
-            WHERE date BETWEEN ? AND ?
-            GROUP BY app_name 
-            ORDER BY hours DESC
-            LIMIT 10
-        """, (start_date, end_date))
-        apps_time = [dict(row) for row in cursor.fetchall()]
-        
-        # Tiempo por sitio web - CON COALESCE
-        cursor.execute("""
-            SELECT 
-                site_name as name,
-                COALESCE(SUM(duration), 0) / 3600.0 as hours 
-            FROM web_activities 
-            WHERE date BETWEEN ? AND ?
-            GROUP BY site_name 
-            ORDER BY hours DESC
-            LIMIT 10
-        """, (start_date, end_date))
-        sites_time = [dict(row) for row in cursor.fetchall()]
-        
         # Resumen general - CON COALESCE
         cursor.execute("""
             SELECT 
@@ -95,8 +69,6 @@ async def get_reports(
         }
         
         return {
-            "appsTime": apps_time,
-            "sitesTime": sites_time,
             "summary": summary,
             "dateRange": f"{start_date} to {end_date}",
             "period": period,

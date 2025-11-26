@@ -14,30 +14,16 @@ async def get_system_status():
         return {"error": "No se pudo conectar a la BD"}
     
     try:
-        cursor = conn.cursor()
-        
-        # Información general - USANDO LOS NOMBRES CORRECTOS
-        cursor.execute("SELECT COUNT(*) as total FROM activities")
-        total_activities = cursor.fetchone()["total"]
-        
-        cursor.execute("SELECT COUNT(*) as total FROM web_activities")
-        total_web = cursor.fetchone()["total"]
-        
-        cursor.execute("SELECT COUNT(DISTINCT app_name) as apps FROM activities")
-        unique_apps = cursor.fetchone()["apps"]
         
         return {
             "status": "online",
             "database": {
                 "path": Config.DB_PATH,
-                "total_activities": total_activities,
-                "total_web_activities": total_web,
-                "unique_apps": unique_apps,
                 "exists": os.path.exists(Config.DB_PATH)
             },
             "server": {
                 "timestamp": datetime.now().isoformat(),
-                "version": "1.0.0"
+                "version": "1.0.1"
             }
         }
     except Exception as e:
