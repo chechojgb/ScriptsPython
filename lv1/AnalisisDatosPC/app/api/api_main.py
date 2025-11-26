@@ -5,7 +5,6 @@ from app.database.connection import init_db
 from app.api.routers import register_routes
 from contextlib import asynccontextmanager
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -24,7 +23,4 @@ app.add_middleware(
 )
 
 register_routes(app)
-     
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=5000, log_level="info")
+

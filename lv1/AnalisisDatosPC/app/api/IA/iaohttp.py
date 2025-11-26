@@ -49,12 +49,12 @@ async def classify_domain(domain: str) -> int:
 
         # Ahora la API devuelve una lista de dicts, no "labels"
         if not isinstance(result, list) or len(result) == 0:
-            print("❌ HuggingFace no devolvió resultados válidos:", result)
+            print("HuggingFace no devolvió resultados válidos:", result)
             return 12  # Other
 
         # Tomar la etiqueta con mayor score
         predicted_label = result[0]["label"]
-        print(f"🤖 IA detecta que '{domain}' pertenece a: {predicted_label}")
+        print(f"IA detecta que '{domain}' pertenece a: {predicted_label}")
 
         # Buscar ID basado en nombre
         for cat_id, cat_name in CANDIDATE_LABELS.items():
@@ -65,5 +65,5 @@ async def classify_domain(domain: str) -> int:
         return 12  # "Other"
 
     except Exception as e:
-        print(f"❌ Error llamando a HuggingFace para '{domain}': {e}")
+        print(f"Error llamando a HuggingFace para '{domain}': {e}")
         return 12  # Other
